@@ -1,13 +1,10 @@
 import streamlit as st
-from PIL import Image
 
+st.set_page_config(page_title="time2vec", page_icon="📖")
 
-st.set_page_config(page_title="Documentation", page_icon="📖")
+st.sidebar.header("Time Series Forecasting")
 
-st.markdown("# Documentation")
-st.sidebar.header("Documentation")
-
-st.subheader("Time Series Forecasting - Time2Vec")
+st.header("Time Series Forecasting - Time2Vec")
 st.write(
 """
 Extracting value from the time series gets complicated really quickly. Yes, one can plug them into a monitoring
@@ -20,12 +17,28 @@ of it.
 """
 )
 
+# st.markdown("![workflow](../app/static/workflow.png)")
 st.markdown(
     '<img src="../app/static/workflow.png" height="400" style="padding-bottom: 50% border: 5px solid orange">',
     unsafe_allow_html=True,
 )
 
-# st.markdown("![workflow](../app/static/workflow.png)")
+st.write("""
+Let me walk you through the boxes and arrows:
+
+We start with a Source of events.
+
+* The events goes into Astra Streaming. At the very least, we sink it for archiving purposes, but we also send 
+  it to a stream processing engine, such as Kaskada.
+* The stream processor constructs time windows for us. For example, we can have 24 hourly readings per a 
+  window covering one day.
+* We can then pull this time window (or a part of it) through the embedding model and store the resulting 
+  vector together with the original window.
+* Later, we do a forecast by taking a not-yet complete window, get its embedding and doing a vector search 
+  for the closes neighbours.
+* We receive the windows that were the most similar to the one we’re querying with. It’s likely that the 
+  current one will develop in a similar way.
+""")
 
 st.write(
 """
@@ -34,7 +47,6 @@ Below is the AstraDB table we used. Notice that sliding windows and vector size 
 of your embeddings
 """
 )
-
 
 st.code('''
 CREATE TABLE IF NOT EXISTS {ASTRA_KEYSPACE_NAME}.electricity (

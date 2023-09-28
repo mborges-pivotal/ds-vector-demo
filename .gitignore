@@ -1,0 +1,5 @@
+.env
+.venv
+*.patch
+__pycache__
+secure-connect*

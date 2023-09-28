@@ -9,6 +9,7 @@ from Model import Date2VecConvert
 
 from cqlsession import getCQLKeyspace, getCQLSession
 from agent_memory import get_answer, format_messages, clear_memory, load_memory
+from vector_store import sim_search
 
 # https://stackoverflow.com/questions/20625582/how-to-deal-with-settingwithcopywarning-in-pandas
 """
@@ -64,6 +65,7 @@ def get_embedding_for_window(df):
 """load_sample_data
 Load the sample data used to train vectorize and test the model
 """
+@st.cache_data
 def load_sample_data():
     df = pd.read_parquet('./data/electricity/train-00000-of-00001.parquet', engine='pyarrow')
 
@@ -154,7 +156,7 @@ if __name__ == "__main__":
     ########################
     # UI
     ########################
-    st.header('Astra VectorDB Demonstration')
+    st.title(':blue[Astra VectorDB] _Demonstration_')
 
     # with st.sidebar:
     #     point = st.slider("Test data starting index", 0, test_data_size)
@@ -206,7 +208,21 @@ if __name__ == "__main__":
                 st.session_state.messages), height=400)
 
     with tab3:
-        st.write("## Search support tickets for past RCA and use in a fine tuned model for propose resolution and mitigation plan")
+        st.write("Search support tickets for past RCA and use in a fine tuned model for propose resolution and mitigation plan")
+        q = st.text_input('Message', key='q')
+        if q:
+            docs = sim_search(session, keyspace, q)
+            for i, doc in enumerate(docs):
+                st.divider()
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.text_input('Type', doc.metadata['Ticket Type'], key="type_%d"%i, disabled=True)
+                with col2:
+                    st.text_input('Rating', doc.metadata['Customer Satisfaction Rating'], key="rating_)%d"%i, disabled=True)
+                st.text_input('Summary:', doc.metadata['Ticket Subject'], key="summary_%d"%i, disabled=True)
+                st.text_area('Description', doc.metadata['Ticket Description'])
+                st.text_area('Resolution', doc.metadata['Resolution'])
+
 
     # with st.sidebar:
     #     conversation_id = st.text_input(

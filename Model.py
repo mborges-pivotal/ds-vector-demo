@@ -4,7 +4,7 @@ from torch import nn
 nn.Module.dump_patches = False 
 
 class Date2VecConvert:
-    def __init__(self, model_path="./d2v_model/d2v_98291_17.169918439404636.pth"):
+    def __init__(self, model_path="./d2v_98291_17.169918439404636.pth"):
         self.model = torch.load(model_path, map_location='cpu').eval()
     
     def __call__(self, x):

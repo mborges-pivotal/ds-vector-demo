@@ -222,12 +222,3 @@ if __name__ == "__main__":
                 st.text_input('Summary:', doc.metadata['Ticket Subject'], key="summary_%d"%i, disabled=True)
                 st.text_area('Description', doc.metadata['Ticket Description'])
                 st.text_area('Resolution', doc.metadata['Resolution'])
-
-
-    # with st.sidebar:
-    #     conversation_id = st.text_input(
-    #         'Conversation ID', 'my-conv-id-01')
-    #     clear_data = st.button(
-    #         'Clear History', on_click=clear_memory, args=[conversation_id])
-    #     load_data = st.button(
-    #         'Load Conversation Memory', on_click=load_memory, args=[conversation_id])

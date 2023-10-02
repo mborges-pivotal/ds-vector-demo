@@ -1,13 +1,8 @@
 import streamlit as st
-from langchain.memory import CassandraChatMessageHistory
-from langchain.memory import ConversationSummaryBufferMemory
-from langchain.chains import ConversationChain
 from langchain.llms import OpenAI
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Cassandra
 
-
-from cqlsession import getCQLSession, getCQLKeyspace
 from langchain.llms import OpenAI
 
 # Globals

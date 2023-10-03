@@ -1,7 +1,8 @@
 import streamlit as st
 
-from cqlsession import getCQLKeyspace, getCQLSession
+from cqlsession import getCQLSession
 
+import logging
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,6 +10,18 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from Model import Date2VecConvert
+
+
+from dotenv import load_dotenv, find_dotenv
+import os
+load_dotenv(find_dotenv(), override=True)
+ASTRA_DB_KEYSPACE = os.environ["ASTRA_DB_KEYSPACE"]
+
+#Globals
+cqlMode = 'astra_db'
+table_name = 'vs_rca_openai'
+
+session = getCQLSession(mode=cqlMode)
 
 table_name = 'electricity'
 
@@ -57,12 +70,12 @@ def get_portion_to_embed():
 """create_data_model
 Data model used for electricity data
 """
-def create_data_model(session, keyspace):
-    drop_table = f"DROP TABLE IF EXISTS {keyspace}.electricity"
+def create_data_model():
+    drop_table = f"DROP TABLE IF EXISTS {ASTRA_DB_KEYSPACE}.electricity"
     session.execute(drop_table)
 
     create_table = f"""
-    CREATE TABLE IF NOT EXISTS {keyspace}.electricity (
+    CREATE TABLE IF NOT EXISTS {ASTRA_DB_KEYSPACE}.electricity (
     id text PRIMARY KEY,
     orig_timestamps vector<float, {SLIDING_WINDOW_SIZE}>,
     orig_demand VECTOR<float, {SLIDING_WINDOW_SIZE}>,
@@ -74,7 +87,7 @@ def create_data_model(session, keyspace):
 
     create_index = f"""
     CREATE CUSTOM INDEX IF NOT EXISTS demand_embedding_index 
-    ON {keyspace}.electricity(embedding) 
+    ON {ASTRA_DB_KEYSPACE}.electricity(embedding) 
     USING 'StorageAttachedIndex'
     WITH OPTIONS = {{ 'similarity_function': 'dot_product' }}
     ;
@@ -85,8 +98,6 @@ def create_data_model(session, keyspace):
 break the dataset into train and test data
 """
 def get_train_test_split():
-    data = load_sample_data()
-
     # Split the data into training and testing sets
     train_data, test_data = train_test_split(data, test_size=0.2, shuffle=False)
     test_data_size = len(test_data) - SLIDING_WINDOW_SIZE
@@ -96,10 +107,10 @@ def get_train_test_split():
 """get_windows
 return a dataframe of windows for a dataset based on desired window size and step
 """
-def get_windows(data, window_size, step):
+def get_windows(data):
     r = np.arange(len(data))
-    s = r[::step]
-    z = list(zip(s, s + window_size))
+    s = r[::STEP]
+    z = list(zip(s, s + SLIDING_WINDOW_SIZE))
     f = '{0[0]}:{0[1]}'.format
     g = lambda t: data.iloc[t[0]:t[1]]
     return pd.concat(map(g, z), keys=map(f, z))
@@ -144,6 +155,40 @@ def create_windows_to_insert():
                 items_to_upload.append((window_df, embedding))
     return items_to_upload
 
+def load_timeseries():
+    create_data_model()
+    items_to_upload = create_windows_to_insert
+    logging.getLogger('cassandra').setLevel(logging.ERROR)
+
+    prepared_insert = session.prepare(f"""
+        INSERT INTO {ASTRA_DB_KEYSPACE}.electricity 
+        (id, orig_timestamps, orig_demand, orig_temperature, embedding) 
+        VALUES (?, ?, ?, ?, ?)
+        """)
+
+    print(f"Uploading {len(items_to_upload)} items.")
+
+    nl = '\n'
+
+    with st.spinner('Loading time series windows...'):
+        for window_df, embeddings in items_to_upload:
+            row_id = window_df.index[0][0] # 0:64 ~ identifier of the indices of the values
+            timestamps = window_df['Date'].values.tolist()
+            demands = window_df['Demand'].values.tolist()
+            temperatures = window_df['Temperature'].values.tolist()
+            embeddings = embeddings
+            # wrapping in a loop to do naiive retries
+            while True:
+                try:
+                    session.execute(prepared_insert, [row_id, timestamps, demands, temperatures, embeddings])
+                    break
+                except Exception as e:
+                    print(e)
+                    print(f'id was: {row_id} :: Vector sizes: {len(timestamps)} {len(demands)} {len(temperatures)} {len(embeddings)}')
+                    break    
+
+
+
 """plot_array
 helper function to plot the lines
 """
@@ -162,7 +207,7 @@ def plot_arrays(arrays, vertical_line_x, colors, labels):
 """get_plot_data
 Doing the actual vector search 
 """
-def get_plot_data(session, keyspace, test_data, point):
+def get_plot_data(point):
     
     # get the query time window
     q_df = test_data.iloc[point:point+SLIDING_WINDOW_SIZE, :]
@@ -173,7 +218,7 @@ def get_plot_data(session, keyspace, test_data, point):
 
     # do a nearest-neighbours query on the embedding
     q = f"""
-    SELECT * FROM {keyspace}.electricity
+    SELECT * FROM {ASTRA_DB_KEYSPACE}.electricity
     ORDER BY embedding ANN OF {embedding} LIMIT 5
     """
     rows = session.execute(q)

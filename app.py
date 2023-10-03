@@ -3,10 +3,9 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from cqlsession import getCQLKeyspace, getCQLSession
-from ts_vstore import get_train_test_split, get_portion_to_embed, get_plot_data, plot_arrays, get_sliding_window, get_step
+from ts_vstore import load_timeseries, get_train_test_split, get_portion_to_embed, get_plot_data, plot_arrays, get_sliding_window, get_step
 from agent_memory import get_answer, format_messages, clear_memory, load_memory
-from rca_vstore import sim_search
+from rca_vstore import load_support_tickets, sim_search
 
 # https://stackoverflow.com/questions/20625582/how-to-deal-with-settingwithcopywarning-in-pandas
 """
@@ -20,8 +19,6 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 #Globals
 cqlMode = 'astra_db'
-session = getCQLSession(mode=cqlMode)
-keyspace = getCQLKeyspace(mode=cqlMode)
 
 """MAIN Function
 """
@@ -55,6 +52,10 @@ if __name__ == "__main__":
 
     tab1, tab2, tab3 = st.tabs(["time series vectors", "Chat memory", "Support tickets"])
 
+    st.sidebar.button('Load Time Series data', on_click=load_timeseries, args=[])
+    st.sidebar.button('Load Support Ticket data', on_click=load_support_tickets, args=[])
+
+
     with tab1:
         st.subheader('Time Series Forecasting')
         col1, col2 = st.columns(2)
@@ -64,7 +65,7 @@ if __name__ == "__main__":
             point = st.slider("Test data starting index", 0, test_data_size)
             # plot the array
             # TODO: get point from session state
-            arrays = get_plot_data(session, ASTRA_DB_KEYSPACE, test_data, point)
+            arrays = get_plot_data(point)
             fig = plot_arrays(arrays, vertical_line_x, colors, labels)
             st.dataframe(test_data)
         with col2:  
@@ -80,30 +81,30 @@ if __name__ == "__main__":
         col1, col2 = st.columns(2)
         with col1:
             clear_data = st.button(
-                'Clear History', on_click=clear_memory, args=[session, keyspace, conversation_id])
+                'Clear History', on_click=clear_memory, args=[conversation_id])
         with col2:
             load_data = st.button(
-                'Load Conversation Memory', on_click=load_memory, args=[session, keyspace, conversation_id])
+                'Load Conversation Memory', on_click=load_memory, args=[conversation_id])
 
         q = st.text_input("Message")
         if q:
-            answer = get_answer(session, keyspace ,conversation_id, q)
+            answer = get_answer(conversation_id, q)
             st.text_area('LLM Answer: ', value=answer)
 
         if 'summary' in st.session_state:
             st.divider()
-            st.text_area(label=f"Summary for conversation id: {st.session_state.conversation_id}", value=st.session_state.summary, height=200)
+            st.text_area(label=f"Summary for conversation id: {st.session_state.conversation_id}", value=st.session_state.summary, height=200, key='summary')
         
         if 'messages' in st.session_state:
             st.divider()
             st.text_area(label="Memory", value=format_messages(
-                st.session_state.messages), height=400)
+                st.session_state.messages), height=400, key='memory')
 
     with tab3:
         st.write("Search support tickets for past RCA and use in a fine tuned model for propose resolution and mitigation plan")
         q = st.text_input('Message', key='q')
         if q:
-            docs = sim_search(session, keyspace, q)
+            docs = sim_search(q)
             for i, doc in enumerate(docs):
                 st.divider()
                 col1, col2 = st.columns(2)
@@ -112,5 +113,5 @@ if __name__ == "__main__":
                 with col2:
                     st.text_input('Rating', doc.metadata['Customer Satisfaction Rating'], key="rating_)%d"%i, disabled=True)
                 st.text_input('Summary:', doc.metadata['Ticket Subject'], key="summary_%d"%i, disabled=True)
-                st.text_area('Description', doc.metadata['Ticket Description'])
-                st.text_area('Resolution', doc.metadata['Resolution'])
+                st.text_area('Description', doc.metadata['Ticket Description'], key="description_%d"%i)
+                st.text_area('Resolution', doc.metadata['Resolution'], key="resolution_%d"%i)

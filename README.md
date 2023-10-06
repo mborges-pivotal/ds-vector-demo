@@ -13,11 +13,14 @@ It is recommended to create a python virtual environment using your tool of choi
 
 ```
 python -m venv .venv
+. ./.venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ## Running
 This application is built using [streamlit](https://streamlit.io/)
+
+Before running the application make sure you have created your own **.env** file. See the **sample_.env** for information on the parameters required.
 
 ```
 streamlit run app.py

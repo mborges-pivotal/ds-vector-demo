@@ -8,8 +8,7 @@ from langchain.llms import OpenAI
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Cassandra
 from langchain.document_loaders import DataFrameLoader
-from langchain.indexes.vectorstore import VectorStoreIndexWrapper, VectorstoreIndexCreator
-
+from langchain.indexes.vectorstore import VectorstoreIndexCreator
 
 from langchain.llms import OpenAI
 

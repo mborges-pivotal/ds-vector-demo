@@ -3,3 +3,4 @@
 *.patch
 __pycache__
 secure-connect*
+.python-version

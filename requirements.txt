@@ -1,5 +1,6 @@
 openai
-langchain
+# langchain
+ragstack-ai
 docx2txt
 pypdf
 streamlit
